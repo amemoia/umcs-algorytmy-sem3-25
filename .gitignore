@@ -10,6 +10,9 @@
 # Prerequisites
 *.d
 
+# Ignore .dSYM files
+*.dSYM
+
 # Compiled Object files
 *.slo
 *.lo
@@ -41,5 +44,4 @@
 *.app
 /.idea
 /.vscode
-/Zadania/0.dSYM
 .DS_Store

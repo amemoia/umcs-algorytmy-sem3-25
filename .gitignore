@@ -45,3 +45,6 @@
 /.idea
 /.vscode
 .DS_Store
+/w/
+/cmake-build-debug/
+/build/

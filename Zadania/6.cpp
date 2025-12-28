@@ -2,7 +2,6 @@
 
 #include <iostream>
 
-
 // p = 0 => samica
 // p = 1 => samiec
 struct Dzik { int x; int y; int p; int idx; };
@@ -13,7 +12,7 @@ struct Dzik { int x; int y; int p; int idx; };
     sum of which can reach 80 000 000 000
     which would go over the int limit
 */
-inline long long dist_sq(const Dzik& a, const Dzik& b)
+long long dist_sq(const Dzik& a, const Dzik& b)
 {
     long long dx = a.x - b.x;
     long long dy = a.y - b.y;
@@ -25,9 +24,6 @@ class Stado
 public:
     int cap = 0;
     int len = 0;
-    int female_count = 0;
-    int male_count = 0;
-    
     Dzik* dziki = nullptr;
     
     // Pre-allocated work arrays (reused across calls)
@@ -48,9 +44,6 @@ public:
     void init(int c)
     {
         len = c;
-        female_count = 0;
-        male_count = 0;
-        
         if (c > cap)
         {
             delete[] dziki;
@@ -69,8 +62,6 @@ public:
     void push(int i, int x, int y, int p)
     {
         dziki[i] = {x, y, p, i};
-        if (p == 0) female_count++;
-        else male_count++;
     }
 
     void merge_x(int left, int mid, int right)
@@ -96,41 +87,6 @@ public:
         merge_sort_x(left, mid);  // left half
         merge_sort_x(mid, right);  // right half
         merge_x(left, mid, right);      // merge halves
-    }
-
-    void initial_sort() {
-        for(int i=0; i<len; ++i) sorted[i] = dziki[i];
-        merge_sort_x(0, len);
-        for(int i=0; i<len; ++i) dziki[i] = sorted[i];
-    }
-
-    void update_dzik(int idx, int dx, int dy) {
-        int pos = -1;
-        for(int i=0; i<len; ++i) {
-            if (dziki[i].idx == idx) {
-                pos = i;
-                break;
-            }
-        }
-        dziki[pos].x += dx;
-        dziki[pos].y += dy;
-        Dzik target = dziki[pos];
-        int curr = pos;
-
-        // move left?
-        while (curr > 0 && (target.x < dziki[curr-1].x || (target.x == dziki[curr-1].x && target.y < dziki[curr-1].y))) {
-            dziki[curr] = dziki[curr-1];
-            curr--;
-        }
-        
-        // move right?
-        if (curr == pos) {
-             while (curr < len - 1 && (target.x > dziki[curr+1].x || (target.x == dziki[curr+1].x && target.y > dziki[curr+1].y))) {
-                dziki[curr] = dziki[curr+1];
-                curr++;
-            }
-        }
-        dziki[curr] = target;
     }
 
     void merge_y(int left, int mid, int right)
@@ -211,58 +167,23 @@ public:
             if (min_dist == -1 || dx * dx < min_dist) strip[strip_size++] = sorted[i];
         }
         
-        // Heuristic: Check adjacent points in strip to quickly find a valid min_dist
-        for (int i = 0; i < strip_size - 1; i++)
-        {
-            if (strip[i].p != strip[i+1].p)
-            {
-                long long d = dist_sq(strip[i], strip[i+1]);
-                if (min_dist == -1 || d < min_dist)
-                {
-                    min_dist = d;
-                    idx_female = (strip[i].p == 0) ? strip[i].idx : strip[i+1].idx;
-                    idx_male = (strip[i].p == 0) ? strip[i+1].idx : strip[i].idx;
-                }
-            }
-        }
-
-        // splits strip into females (s0) and males (s1) to avoid checking samegender pairs
-        int c0 = 0;
+        // check only nearby points in Y-sorted strip
         for (int i = 0; i < strip_size; i++)
         {
-            if (strip[i].p == 0) temp[c0++] = strip[i];
-        }
-        
-        int c1 = 0;
-        for (int i = 0; i < strip_size; i++)
-        {
-            if (strip[i].p == 1) strip[c1++] = strip[i];
-        }
-
-        Dzik* s0 = temp;
-        Dzik* s1 = strip;
-        
-        int k = 0;
-        for (int i = 0; i < c0; i++)
-        {
-            while (k < c1)
+            for (int j = i + 1; j < strip_size && j < i + 8; j++)
             {
-                long long dy = s1[k].y - s0[i].y;
-                if (dy < 0 && min_dist != -1 && dy * dy >= min_dist) k++;
-                else break;
-            }
-            
-            for (int j = k; j < c1; j++)
-            {
-                long long dy = s1[j].y - s0[i].y;
-                if (min_dist != -1 && dy * dy >= min_dist) break;
-                
-                long long d = dist_sq(s0[i], s1[j]);
-                if (min_dist == -1 || d < min_dist)
+                if (strip[i].p != strip[j].p)
                 {
-                    min_dist = d;
-                    idx_female = s0[i].idx;
-                    idx_male = s1[j].idx;
+                    long long dy = strip[j].y - strip[i].y;
+                    if (min_dist != -1 && dy * dy >= min_dist) break;
+                    
+                    long long d = dist_sq(strip[i], strip[j]);
+                    if (min_dist == -1 || d < min_dist)
+                    {
+                        min_dist = d;
+                        idx_female = (strip[i].p == 0) ? strip[i].idx : strip[j].idx;
+                        idx_male = (strip[i].p == 0) ? strip[j].idx : strip[i].idx;
+                    }
                 }
             }
         }
@@ -273,8 +194,18 @@ public:
         idx_female = -1;
         idx_male = -1;
         
-        if (female_count == 0 || male_count == 0) return;
-        for (int i = 0; i < len; i++) sorted[i] = dziki[i];
+        bool has_female = false, has_male = false;
+        for (int i = 0; i < len; i++)
+        {
+            sorted[i] = dziki[i];
+            if (dziki[i].p == 0) has_female = true;
+            else has_male = true;
+        }
+        
+        if (!has_female || !has_male) return;
+
+        merge_sort_x(0, len);
+        
         long long min_dist = -1;
         closest_rec(0, len, min_dist, idx_female, idx_male);
     }
@@ -291,7 +222,7 @@ int main()
     
     Stado stado; // Reuse one instance
     
-    while (s--)
+    for (int i = 0; i < s; i++)
     {
         int n_i;
         std::cin >> n_i;
@@ -302,8 +233,6 @@ int main()
             std::cin >> x >> y >> p;
             stado.push(j, x, y, p);
         }
-
-        stado.initial_sort();
 
         int idx_female, idx_male;
         stado.find_closest(idx_female, idx_male);
@@ -318,8 +247,12 @@ int main()
         {
             int idx, dx, dy;
             std::cin >> idx >> dx >> dy;
-            stado.update_dzik(idx, dx, dy);
+            
+            stado.dziki[idx].x += dx;
+            stado.dziki[idx].y += dy;
+            
             stado.find_closest(idx_female, idx_male);
+            
             if (idx_female == -1) std::cout << "0\n";
             else std::cout << idx_female << " " << idx_male << "\n";
         }
